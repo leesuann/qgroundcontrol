@@ -19,7 +19,7 @@ ListModel {
         iconUrl: "qrc:/res/QGCLogoWhite"
         pageVisible: function() { return true }
     }
-
+    //Test
     ListElement {
         name: qsTr("Fly View")
         url: "/qml/FlyViewSettings.qml"
