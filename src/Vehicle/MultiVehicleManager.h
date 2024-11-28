@@ -19,11 +19,9 @@
 
 #include "QGCToolbox.h"
 #include "QmlObjectListModel.h"
+#include "MAVLinkLib.h"
 
-class FirmwarePluginManager;
-class JoystickManager;
 class QGCApplication;
-class MAVLinkProtocol;
 class LinkInterface;
 class Vehicle;
 
@@ -110,9 +108,6 @@ private:
 
     QmlObjectListModel  _vehicles;
 
-    FirmwarePluginManager*      _firmwarePluginManager;
-    JoystickManager*            _joystickManager;
-    MAVLinkProtocol*            _mavlinkProtocol;
     QGeoCoordinate              _lastKnownLocation;
 
     QTimer              _gcsHeartbeatTimer;             ///< Timer to emit heartbeats

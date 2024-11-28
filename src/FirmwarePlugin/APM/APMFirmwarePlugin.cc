@@ -522,7 +522,7 @@ void APMFirmwarePlugin::_getParameterMetaDataVersionInfo(const QString& metaData
 }
 
 
-QList<MAV_CMD> APMFirmwarePlugin::supportedMissionCommands(QGCMAVLink::VehicleClass_t vehicleClass)
+QList<MAV_CMD> APMFirmwarePlugin::supportedMissionCommands(QGCMAVLink::VehicleClass_t vehicleClass) const
 {
     QList<MAV_CMD> supportedCommands = {
         MAV_CMD_NAV_WAYPOINT,
@@ -541,7 +541,7 @@ QList<MAV_CMD> APMFirmwarePlugin::supportedMissionCommands(QGCMAVLink::VehicleCl
         MAV_CMD_DO_SET_RELAY, MAV_CMD_DO_REPEAT_RELAY,
         MAV_CMD_DO_SET_SERVO, MAV_CMD_DO_REPEAT_SERVO,
         MAV_CMD_DO_LAND_START,
-        MAV_CMD_DO_SET_ROI_LOCATION, MAV_CMD_DO_SET_ROI_NONE,
+        MAV_CMD_DO_SET_ROI,
         MAV_CMD_DO_DIGICAM_CONFIGURE, MAV_CMD_DO_DIGICAM_CONTROL,
         MAV_CMD_DO_MOUNT_CONTROL,
         MAV_CMD_DO_GIMBAL_MANAGER_PITCHYAW,
@@ -874,10 +874,9 @@ void APMFirmwarePlugin::guidedModeChangeAltitude(Vehicle* vehicle, double altitu
         cmd.y = 0.0f;
         cmd.z = static_cast<float>(-(altitudeChange));
 
-        MAVLinkProtocol* mavlink = qgcApp()->toolbox()->mavlinkProtocol();
         mavlink_msg_set_position_target_local_ned_encode_chan(
-                    static_cast<uint8_t>(mavlink->getSystemId()),
-                    static_cast<uint8_t>(mavlink->getComponentId()),
+                    static_cast<uint8_t>(MAVLinkProtocol::instance()->getSystemId()),
+                    static_cast<uint8_t>(MAVLinkProtocol::getComponentId()),
                     sharedLink->mavlinkChannel(),
                     &msg,
                     &cmd);
@@ -1083,10 +1082,9 @@ void APMFirmwarePlugin::_handleRCChannels(Vehicle* vehicle, mavlink_message_t* m
         if(channels.rssi && channels.rssi != 255) {
             channels.rssi = static_cast<uint8_t>(static_cast<double>(channels.rssi) / 254.0 * 100.0);
         }
-        MAVLinkProtocol* mavlink = qgcApp()->toolbox()->mavlinkProtocol();
         mavlink_msg_rc_channels_encode_chan(
-                    static_cast<uint8_t>(mavlink->getSystemId()),
-                    static_cast<uint8_t>(mavlink->getComponentId()),
+                    static_cast<uint8_t>(MAVLinkProtocol::instance()->getSystemId()),
+                    static_cast<uint8_t>(MAVLinkProtocol::getComponentId()),
                     sharedLink->mavlinkChannel(),
                     message,
                     &channels);
@@ -1104,10 +1102,9 @@ void APMFirmwarePlugin::_handleRCChannelsRaw(Vehicle* vehicle, mavlink_message_t
         if(channels.rssi) {
             channels.rssi = static_cast<uint8_t>(static_cast<double>(channels.rssi) / 255.0 * 100.0);
         }
-        MAVLinkProtocol* mavlink = qgcApp()->toolbox()->mavlinkProtocol();
         mavlink_msg_rc_channels_raw_encode_chan(
-                    static_cast<uint8_t>(mavlink->getSystemId()),
-                    static_cast<uint8_t>(mavlink->getComponentId()),
+                    static_cast<uint8_t>(MAVLinkProtocol::instance()->getSystemId()),
+                    static_cast<uint8_t>(MAVLinkProtocol::getComponentId()),
                     sharedLink->mavlinkChannel(),
                     message,
                     &channels);
@@ -1142,7 +1139,6 @@ void APMFirmwarePlugin::sendGCSMotionReport(Vehicle *vehicle, FollowMe::GCSMotio
         return;
     }
 
-    const MAVLinkProtocol* const mavlinkProtocol = qgcApp()->toolbox()->mavlinkProtocol();
     const mavlink_global_position_int_t globalPositionInt = {
         static_cast<uint32_t>(qgcApp()->msecsSinceBoot()),                  /*< [ms] Timestamp (time since system boot).*/
         motionReport.lat_int,                                               /*< [degE7] Latitude, expressed*/
@@ -1157,8 +1153,8 @@ void APMFirmwarePlugin::sendGCSMotionReport(Vehicle *vehicle, FollowMe::GCSMotio
 
     mavlink_message_t message;
     (void) mavlink_msg_global_position_int_encode_chan(
-        static_cast<uint8_t>(mavlinkProtocol->getSystemId()),
-        static_cast<uint8_t>(mavlinkProtocol->getComponentId()),
+        static_cast<uint8_t>(MAVLinkProtocol::instance()->getSystemId()),
+        static_cast<uint8_t>(MAVLinkProtocol::getComponentId()),
         sharedLink->mavlinkChannel(),
         &message,
         &globalPositionInt

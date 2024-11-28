@@ -1,6 +1,10 @@
 cmake_minimum_required(VERSION 3.22.1)
 
-list(APPEND CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/cmake)
+list(APPEND CMAKE_MODULE_PATH
+    ${CMAKE_SOURCE_DIR}/cmake
+    ${CMAKE_SOURCE_DIR}/cmake/modules
+    ${CMAKE_SOURCE_DIR}/cmake/find-modules
+)
 
 #######################################################
 #                Custom Build Configuration
@@ -104,7 +108,7 @@ if(CMAKE_CROSSCOMPILING AND ANDROID)
     set(CMAKE_FIND_ROOT_PATH_MODE_PACKAGE BOTH)
 endif()
 
-set(BUILD_SHARED_LIBS OFF)
+set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
 
 #######################################################
 #               Qt6 Configuration
@@ -146,28 +150,26 @@ if(ANDROID)
         message(STATUS "QT_ANDROID_KEYSTORE_ALIAS $ENV{QT_ANDROID_KEYSTORE_ALIAS}")
         # QT_ANDROID_KEYSTORE_STORE_PASS, QT_ANDROID_KEYSTORE_KEY_PASS
     endif()
-
-    if(NOT Qt6LinguistTools_DIR)
-        set(Qt6LinguistTools_DIR ${QT_HOST_PATH}/lib/cmake/Qt6LinguistTools)
-    endif()
 endif()
+
+set(QT_SILENCE_MISSING_DEPENDENCY_TARGET_WARNING ON)
 
 find_package(Qt6
     REQUIRED
     COMPONENTS
-        Bluetooth
-        Charts
         Concurrent
         Core
         Core5Compat
         Location
         Multimedia
         Network
+        OpenGL
         Positioning
+        Qml
+        QmlIntegration
         Quick
         QuickControls2
         QuickWidgets
-        OpenGL
         Sensors
         Sql
         Svg
@@ -176,11 +178,20 @@ find_package(Qt6
         Widgets
         Xml
     OPTIONAL_COMPONENTS
+        Bluetooth
+        Charts
         LinguistTools
+        MultimediaQuickPrivate
+        Quick3D
         SerialPort
+        WaylandClient
     HINTS
         ${QT_LIBRARY_HINTS}
 )
+
+if(NOT Qt6LinguistTools_DIR)
+    set(Qt6LinguistTools_DIR ${QT_HOST_PATH}/lib/cmake/Qt6LinguistTools)
+endif()
 
 # Require 6.6.3 because otherwise libQt6QuickControls2Basic.so.6 &
 # libQt6QuickControls2BasicStyleImpl.so.6 are missing.
@@ -195,7 +206,6 @@ qt_policy(
 #                QGroundControl Options
 #######################################################
 
-option(QGC_STABLE_BUILD "Stable build option" OFF)
 if(NOT QGC_STABLE_BUILD)
     add_compile_definitions(DAILY_BUILD)
 endif()
@@ -203,6 +213,8 @@ endif()
 cmake_dependent_option(QGC_BUILD_TESTING "Enable testing" ON "CMAKE_BUILD_TYPE STREQUAL Debug" OFF)
 if(QGC_BUILD_TESTING)
     add_compile_definitions(UNITTEST_BUILD) # TODO: QGC_UNITTEST_BUILD
+else()
+    set(BUILD_TESTING OFF CACHE INTERNAL "")
 endif()
 
 # option(QGC_DISABLE_MAVLINK_INSPECTOR "Disable Mavlink Inspector" OFF) # This removes QtCharts which is GPL licensed
@@ -212,8 +224,6 @@ if(QGC_DEBUG_QML)
     message(STATUS "To enable the QML debugger/profiler, run with: '-qmljsdebugger=port:1234'")
     add_compile_definitions(QT_QML_DEBUG)
 endif()
-
-cmake_dependent_option(QGC_NO_SERIAL_LINK "Build QGroundControl without Serial Support Support." OFF "NOT IOS" ON)
 
 if(QGC_DISABLE_APM_MAVLINK)
     add_compile_definitions(NO_ARDUPILOT_DIALECT)
@@ -260,7 +270,6 @@ list(APPEND QGC_RESOURCES
 )
 
 if(QGC_UTM_ADAPTER)
-    add_definitions(-DQGC_UTM_ADAPTER)
     list(APPEND QGC_RESOURCES ${CMAKE_SOURCE_DIR}/src/UTMSP/utmsp.qrc)
 else()
     list(APPEND QGC_RESOURCES ${CMAKE_SOURCE_DIR}/src/UTMSP/dummy/utmsp_dummy.qrc)
@@ -423,7 +432,7 @@ elseif(LINUX)
 endif()
 
 add_compile_definitions(
-    QGC_APP_NAME="${CMAKE_PROJECT_NAME}"
+    QGC_APP_NAME="${QGC_APP_NAME}"
     QGC_ORG_NAME="${QGC_ORG_NAME}"
     QGC_ORG_DOMAIN="${QGC_ORG_DOMAIN}"
     QGC_APP_VERSION_STR="${QGC_APP_VERSION_STR}"
@@ -506,6 +515,10 @@ if(LINUX)
     install(
         FILES ${CMAKE_BINARY_DIR}/metainfo/org.mavlink.qgroundcontrol.metainfo.xml
         DESTINATION ${CMAKE_INSTALL_DATADIR}/metainfo/
+    )
+    install(
+        FILES ${CMAKE_SOURCE_DIR}/deploy/linux/AppRun
+        DESTINATION ${CMAKE_BINARY_DIR}
     )
     install(SCRIPT "${CMAKE_SOURCE_DIR}/cmake/CreateAppImage.cmake")
 elseif(WIN32)

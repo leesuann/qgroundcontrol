@@ -87,9 +87,10 @@ ApplicationWindow {
         readonly property var       planMasterControllerFlyView:    flyView.planController
         readonly property var       guidedControllerFlyView:        flyView.guidedController
 
-        property bool               validationError:                false   // There is a FactTextField somewhere with a validation error
+        // Number of QGCTextField's with validation errors. Used to prevent closing panels with validation errors.
+        property int                validationErrorCount:           0 
 
-        // Property to manage RemoteID quick acces to settings page
+        // Property to manage RemoteID quick access to settings page
         property bool               commingFromRIDIndicator:        false
     }
 
@@ -109,9 +110,13 @@ ApplicationWindow {
     //-------------------------------------------------------------------------
     //-- Global Scope Functions
 
-    /// @return true: View switches are not currently allowed
-    function preventViewSwitch() {
-        return globals.validationError
+    // This function is used to prevent view switching if there are validation errors
+    function allowViewSwitch() {
+        // Run validation on active focus control to ensure it is valid before switching views
+        if (mainWindow.activeFocusControl instanceof QGCTextField) {
+            mainWindow.activeFocusControl.onEditingFinished()
+        }
+        return globals.validationErrorCount === 0
     }
 
     function showPlanView() {
@@ -186,10 +191,25 @@ ApplicationWindow {
         mainWindow.close()
     }
 
-    // On attempting an application close we check for:
-    //  Unsaved missions - then
-    //  Pending parameter writes - then
-    //  Active connections
+    // Check for things which should prevent the app from closing
+    //  Returns true if it is OK to close
+    readonly property int _skipUnsavedMissionCheckMask: 0x01
+    readonly property int _skipPendingParameterWritesCheckMask: 0x02
+    readonly property int _skipActiveConnectionsCheckMask: 0x04
+    property int _closeChecksToSkip: 0
+    function performCloseChecks() {
+        if (!(_closeChecksToSkip & _skipUnsavedMissionCheckMask) && !checkForUnsavedMission()) {
+            return false
+        }
+        if (!(_closeChecksToSkip & _skipPendingParameterWritesCheckMask) && !checkForPendingParameterWrites()) {
+            return false
+        }
+        if (!(_closeChecksToSkip & _skipActiveConnectionsCheckMask) && !checkForActiveConnections()) {
+            return false
+        }
+        finishCloseProcess()
+        return true
+    }
 
     property string closeDialogTitle: qsTr("Close %1").arg(QGroundControl.appName)
 
@@ -198,10 +218,10 @@ ApplicationWindow {
             showMessageDialog(closeDialogTitle,
                               qsTr("You have a mission edit in progress which has not been saved/sent. If you close you will lose changes. Are you sure you want to close?"),
                               Dialog.Yes | Dialog.No,
-                              function() { checkForPendingParameterWrites() })
+                              function() { _closeChecksToSkip |= _skipUnsavedMissionCheckMask; performCloseChecks() })
             return false
         } else {
-            return checkForPendingParameterWrites()
+            return true
         }
     }
 
@@ -211,11 +231,11 @@ ApplicationWindow {
                 mainWindow.showMessageDialog(closeDialogTitle,
                     qsTr("You have pending parameter updates to a vehicle. If you close you will lose changes. Are you sure you want to close?"),
                     Dialog.Yes | Dialog.No,
-                    function() { checkForActiveConnections() })
+                    function() { _closeChecksToSkip |= _skipPendingParameterWritesCheckMask; performCloseChecks() })
                 return false
             }
         }
-        return checkForActiveConnections()
+        return true
     }
 
     function checkForActiveConnections() {
@@ -223,17 +243,17 @@ ApplicationWindow {
             mainWindow.showMessageDialog(closeDialogTitle,
                 qsTr("There are still active connections to vehicles. Are you sure you want to exit?"),
                 Dialog.Yes | Dialog.No,
-                function() { finishCloseProcess() })
+                function() { _closeChecksToSkip |= _skipActiveConnectionsCheckMask; performCloseChecks() })
             return false
         } else {
-            finishCloseProcess()
             return true
         }
     }
 
     onClosing: (close) => {
         if (!_forceClose) {
-            close.accepted = checkForUnsavedMission()
+            _closeChecksToSkip = 0
+            close.accepted = performCloseChecks()
         }
     }
 
@@ -259,7 +279,7 @@ ApplicationWindow {
     }
 
     function showToolSelectDialog() {
-        if (!mainWindow.preventViewSwitch()) {
+        if (mainWindow.allowViewSwitch()) {
             mainWindow.showIndicatorDrawer(toolSelectComponent, null)
         }
     }
@@ -291,7 +311,7 @@ ApplicationWindow {
                             text:               qsTr("Vehicle Setup")
                             imageResource:      "/qmlimages/Gears.svg"
                             onClicked: {
-                                if (!mainWindow.preventViewSwitch()) {
+                                if (mainWindow.allowViewSwitch()) {
                                     mainWindow.closeIndicatorDrawer()
                                     mainWindow.showVehicleSetupTool()
                                 }
@@ -306,7 +326,7 @@ ApplicationWindow {
                             imageResource:      "/qmlimages/Analyze.svg"
                             visible:            QGroundControl.corePlugin.showAdvancedUI
                             onClicked: {
-                                if (!mainWindow.preventViewSwitch()) {
+                                if (mainWindow.allowViewSwitch()) {
                                     mainWindow.closeIndicatorDrawer()
                                     mainWindow.showAnalyzeTool()
                                 }
@@ -322,9 +342,22 @@ ApplicationWindow {
                             imageColor:         "transparent"
                             visible:            !QGroundControl.corePlugin.options.combineSettingsAndSetup
                             onClicked: {
-                                if (!mainWindow.preventViewSwitch()) {
+                                if (mainWindow.allowViewSwitch()) {
                                     drawer.close()
                                     mainWindow.showSettingsTool()
+                                }
+                            }
+                        }
+
+                        SubMenuButton {
+                            id:                 closeButton
+                            height:             toolSelectDialog._toolButtonHeight
+                            Layout.fillWidth:   true
+                            text:               qsTr("Close %1").arg(QGroundControl.appName)
+                            visible:            mainWindow.visibility === Window.FullScreen
+                            onClicked: {
+                                if (mainWindow.allowViewSwitch()) {
+                                    mainWindow.finishCloseProcess()
                                 }
                             }
                         }
@@ -498,7 +531,9 @@ ApplicationWindow {
                 x:                  parent.mapFromItem(backIcon, backIcon.x, backIcon.y).x
                 width:              (backTextLabel.x + backTextLabel.width) - backIcon.x
                 onClicked: {
-                    toolDrawer.visible      = false
+                    if (mainWindow.allowViewSwitch()) {
+                        toolDrawer.visible = false
+                    }
                 }
             }
         }

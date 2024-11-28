@@ -24,19 +24,10 @@ file(REMOVE_RECURSE staging/QGroundControl.app/Contents/Frameworks/GStreamer.fra
 file(REMOVE_RECURSE staging/QGroundControl.app/Contents/Frameworks/GStreamer.framework/Versions/1.0/lib/gstreamer-1.0/pkgconfig)
 
 # Fix up library paths to point into bundle
-execute_process(COMMAND install_name_tool -change @rpath/libgstgl-1.0.0.dylib @executable_path/../Frameworks/GStreamer.framework/Libraries/libgstgl-1.0.0.dylib staging/QGroundControl.app/Contents/MacOS/QGroundControl)
-execute_process(COMMAND install_name_tool -change @rpath/libgstvideo-1.0.0.dylib @executable_path/../Frameworks/GStreamer.framework/Libraries/libgstvideo-1.0.0.dylib staging/QGroundControl.app/Contents/MacOS/QGroundControl)
-execute_process(COMMAND install_name_tool -change @rpath/libgstbase-1.0.0.dylib @executable_path/../Frameworks/GStreamer.framework/Libraries/libgstbase-1.0.0.dylib staging/QGroundControl.app/Contents/MacOS/QGroundControl)
-execute_process(COMMAND install_name_tool -change @rpath/libgstreamer-1.0.0.dylib @executable_path/../Frameworks/GStreamer.framework/Libraries/libgstreamer-1.0.0.dylib staging/QGroundControl.app/Contents/MacOS/QGroundControl)
-execute_process(COMMAND install_name_tool -change @rpath/libgobject-2.0.0.dylib @executable_path/../Frameworks/GStreamer.framework/Libraries/libgobject-2.0.0.dylib staging/QGroundControl.app/Contents/MacOS/QGroundControl)
-execute_process(COMMAND install_name_tool -change @rpath/libglib-2.0.0.dylib @executable_path/../Frameworks/GStreamer.framework/Libraries/libglib-2.0.0.dylib staging/QGroundControl.app/Contents/MacOS/QGroundControl)
-execute_process(COMMAND install_name_tool -change @rpath/libintl.8.dylib @executable_path/../Frameworks/GStreamer.framework/Libraries/libintl.8.dylib staging/QGroundControl.app/Contents/MacOS/QGroundControl)
+execute_process(COMMAND install_name_tool -change /Library/Frameworks/GStreamer.framework/Versions/1.0/lib/GStreamer @executable_path/../Frameworks/GStreamer.framework/Versions/1.0/lib/GStreamer staging/QGroundControl.app/Contents/MacOS/QGroundControl)
 
 message(STATUS "Creating Mac DMG")
 file(REMOVE_RECURSE package)
 file(MAKE_DIRECTORY package)
 file(COPY staging/QGroundControl.app DESTINATION package)
-file(REMOVE /tmp/tmp.dmg)
-execute_process(COMMAND hdiutil create /tmp/tmp.dmg -ov -volname QGroundControl -fs APFS -srcfolder package)
-execute_process(COMMAND hdiutil convert /tmp/tmp.dmg -format UDBZ -o package/QGroundControl.dmg)
-file(REMOVE /tmp/tmp.dmg)
+execute_process(COMMAND create-dmg --volname "QGroundControl Installer" "QGroundControl.dmg" "package/")

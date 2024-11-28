@@ -18,12 +18,7 @@ qt_add_library(QGC STATIC
     QGCToolbox.h
 )
 
-if(QGC_UTM_ADAPTER)
-    add_definitions(-DQGC_UTM_ADAPTER)
-endif()
-
 add_subdirectory(ADSB)
-add_subdirectory(AirLink)
 add_subdirectory(AnalyzeView)
 add_subdirectory(API)
 add_subdirectory(Audio)
@@ -67,8 +62,6 @@ target_link_libraries(QGC
         Qt6::Core5Compat
         Qt6::Bluetooth
         API
-        ADSB
-        AirLink
         AnalyzeView
         Audio
         AutoPilotPlugins
@@ -82,7 +75,7 @@ target_link_libraries(QGC
         # FlightDisplay
         FollowMe
         Gimbal
-        GPS
+        GStreamerReceiver
         Joystick
         MAVLink
         MissionManager
@@ -91,15 +84,12 @@ target_link_libraries(QGC
         QGCLocation
         QmlControls
         Settings
-        Terrain
         # UI
         Utilities
-        UTMSP
         Vehicle
         VehicleSetup
         Viewer3D
         VideoManager
-        VideoReceiver
     PUBLIC
         Qt6::Core
         Qt6::CorePrivate
@@ -131,6 +121,10 @@ if(ANDROID)
     )
 
     target_include_directories(QGC PUBLIC ${CMAKE_SOURCE_DIR}/android/src)
+    target_precompile_headers(QGC
+        PRIVATE
+            <QtCore/QJniEnvironment>
+    )
 else()
     target_sources(QGC
         PRIVATE
@@ -139,4 +133,8 @@ else()
     )
 endif()
 
-target_precompile_headers(QGC PRIVATE ${CMAKE_SOURCE_DIR}/src/pch.h)
+target_precompile_headers(QGC
+    PRIVATE
+        ${CMAKE_SOURCE_DIR}/src/pch.h
+        <QtWidgets/QApplication>
+)

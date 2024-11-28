@@ -1,3 +1,4 @@
+add_subdirectory(AirLink)
 add_subdirectory(MockLink)
 
 find_package(Qt6 REQUIRED COMPONENTS Core Network Qml Test Widgets)
@@ -23,13 +24,14 @@ target_link_libraries(Comms
     PRIVATE
         Qt6::Qml
         Qt6::Test
-        AirLink
         MockLink
+        PositionManager
         Settings
         Vehicle
     PUBLIC
         Qt6::Core
         Qt6::Network
+        AirLink
         MAVLink
         QGC
         QmlControls
@@ -69,12 +71,15 @@ else()
     else()
         find_package(Qt6 REQUIRED COMPONENTS SerialPort)
         target_link_libraries(Comms PUBLIC Qt6::SerialPort)
+        target_precompile_headers(Comms
+            PRIVATE
+                <QtSerialPort/QSerialPort>
+        )
     endif()
 endif()
 
 ############# Bluetooth
 
-option(QGC_ENABLE_BLUETOOTH "Enable Bluetooth Links" ON)
 if(QGC_ENABLE_BLUETOOTH)
     find_package(Qt6 REQUIRED COMPONENTS Bluetooth)
     target_link_libraries(Comms PUBLIC Qt6::Bluetooth)
@@ -84,13 +89,15 @@ if(QGC_ENABLE_BLUETOOTH)
             BluetoothLink.h
     )
     target_compile_definitions(Comms PUBLIC QGC_ENABLE_BLUETOOTH)
+    target_precompile_headers(Comms
+        PRIVATE
+            <QtBluetooth/QBluetoothSocket>
+    )
 endif()
 
 ############# ZEROConf
 
-option(QGC_ZEROCONF_ENABLED "Enable ZeroConf Compatibility" OFF)
 if(QGC_ZEROCONF_ENABLED)
-    set(BUILD_SHARED_LIBS OFF CACHE INTERNAL "")
     set(BUILD_DOC OFF CACHE INTERNAL "")
     set(BUILD_EXAMPLES OFF CACHE INTERNAL "")
     set(BUILD_TESTS OFF CACHE INTERNAL "")

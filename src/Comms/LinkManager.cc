@@ -28,6 +28,7 @@
 #include "GPSManager.h"
 #include "PositionManager.h"
 #include "UdpIODevice.h"
+#include "GPSRtk.h"
 #endif
 
 #ifdef QT_DEBUG
@@ -35,7 +36,7 @@
 #endif
 
 #ifndef QGC_AIRLINK_DISABLED
-#include "AirlinkLink.h"
+#include "AirLinkLink.h"
 #endif
 
 #ifdef QGC_ZEROCONF_ENABLED
@@ -87,7 +88,6 @@ void LinkManager::setToolbox(QGCToolbox *toolbox)
     QGCTool::setToolbox(toolbox);
 
     _autoConnectSettings = toolbox->settingsManager()->autoConnectSettings();
-    _mavlinkProtocol = _toolbox->mavlinkProtocol();
 
     if (!qgcApp()->runningUnitTests()) {
         (void) connect(_portListTimer, &QTimer::timeout, this, &LinkManager::_updateAutoConnectLinks);
@@ -139,8 +139,8 @@ bool LinkManager::createConnectedLink(SharedLinkConfigurationPtr &config)
         break;
 #endif
 #ifndef QGC_AIRLINK_DISABLED
-    case LinkConfiguration::Airlink:
-        link = std::make_shared<AirlinkLink>(config);
+    case LinkConfiguration::AirLink:
+        link = std::make_shared<AirLinkLink>(config);
         break;
 #endif
     case LinkConfiguration::TypeLast:
@@ -161,12 +161,12 @@ bool LinkManager::createConnectedLink(SharedLinkConfigurationPtr &config)
     config->setLink(link);
 
     (void) connect(link.get(), &LinkInterface::communicationError, _app, &QGCApplication::criticalMessageBoxOnMainThread);
-    (void) connect(link.get(), &LinkInterface::bytesReceived, _mavlinkProtocol, &MAVLinkProtocol::receiveBytes);
-    (void) connect(link.get(), &LinkInterface::bytesSent, _mavlinkProtocol, &MAVLinkProtocol::logSentBytes);
+    (void) connect(link.get(), &LinkInterface::bytesReceived, MAVLinkProtocol::instance(), &MAVLinkProtocol::receiveBytes);
+    (void) connect(link.get(), &LinkInterface::bytesSent, MAVLinkProtocol::instance(), &MAVLinkProtocol::logSentBytes);
     (void) connect(link.get(), &LinkInterface::disconnected, this, &LinkManager::_linkDisconnected);
 
-    _mavlinkProtocol->resetMetadataForLink(link.get());
-    _mavlinkProtocol->setVersion(_mavlinkProtocol->getCurrentVersion());
+    MAVLinkProtocol::instance()->resetMetadataForLink(link.get());
+    MAVLinkProtocol::instance()->setVersion(MAVLinkProtocol::instance()->getCurrentVersion());
 
     if (!link->_connect()) {
         link->_freeMavlinkChannel();
@@ -219,8 +219,8 @@ void LinkManager::_linkDisconnected()
     }
 
     (void) disconnect(link, &LinkInterface::communicationError, _app, &QGCApplication::criticalMessageBoxOnMainThread);
-    (void) disconnect(link, &LinkInterface::bytesReceived, _mavlinkProtocol, &MAVLinkProtocol::receiveBytes);
-    (void) disconnect(link, &LinkInterface::bytesSent, _mavlinkProtocol, &MAVLinkProtocol::logSentBytes);
+    (void) disconnect(link, &LinkInterface::bytesReceived, MAVLinkProtocol::instance(), &MAVLinkProtocol::receiveBytes);
+    (void) disconnect(link, &LinkInterface::bytesSent, MAVLinkProtocol::instance(), &MAVLinkProtocol::logSentBytes);
     (void) disconnect(link, &LinkInterface::disconnected, this, &LinkManager::_linkDisconnected);
 
     link->_freeMavlinkChannel();
@@ -228,6 +228,8 @@ void LinkManager::_linkDisconnected()
     for (auto it = _rgLinks.begin(); it != _rgLinks.end(); ++it) {
         if (it->get() == link) {
             qCDebug(LinkManagerLog) << "LinkManager::_linkDisconnected" << it->get()->linkConfiguration()->name() << it->use_count();
+            SharedLinkConfigurationPtr config = it->get()->linkConfiguration();
+            config->setLink(nullptr);
             (void) _rgLinks.erase(it);
             return;
         }
@@ -343,8 +345,8 @@ void LinkManager::loadLinkConfigurationList()
                 break;
 #endif
 #ifndef QGC_AIRLINK_DISABLED
-            case LinkConfiguration::Airlink:
-                link = new AirlinkConfiguration(name);
+            case LinkConfiguration::AirLink:
+                link = new AirLinkConfiguration(name);
                 break;
 #endif
             case LinkConfiguration::TypeLast:
@@ -756,7 +758,7 @@ void LinkManager::_addSerialAutoConnectLink()
             qCDebug(LinkManagerLog) << "Changing port for UDP NMEA stream";
             _nmeaSocket->close();
             _nmeaSocket->bind(QHostAddress::AnyIPv4, _autoConnectSettings->nmeaUdpPort()->rawValue().toUInt());
-            _toolbox->qgcPositionManager()->setNmeaSourceDevice(_nmeaSocket);
+            QGCPositionManager::instance()->setNmeaSourceDevice(_nmeaSocket);
         }
         if (_nmeaPort) {
             _nmeaPort->close();
@@ -806,7 +808,7 @@ void LinkManager::_addSerialAutoConnectLink()
                 newPort->setBaudRate(static_cast<qint32>(_nmeaBaud));
                 qCDebug(LinkManagerLog) << "Configuring nmea baudrate" << _nmeaBaud;
                 // This will stop polling old device if previously set
-                _toolbox->qgcPositionManager()->setNmeaSourceDevice(newPort);
+                QGCPositionManager::instance()->setNmeaSourceDevice(newPort);
                 if (_nmeaPort) {
                     delete _nmeaPort;
                 }
@@ -852,7 +854,7 @@ void LinkManager::_addSerialAutoConnectLink()
                 case QGCSerialPortInfo::BoardTypeRTKGPS:
                     qCDebug(LinkManagerLog) << "RTK GPS auto-connected" << portInfo.portName().trimmed();
                     _autoConnectRTKPort = portInfo.systemLocation();
-                    _toolbox->gpsManager()->connectGPS(portInfo.systemLocation(), boardName);
+                    GPSManager::instance()->gpsRtk()->connectGPS(portInfo.systemLocation(), boardName);
                     break;
                 default:
                     qCWarning(LinkManagerLog) << "Internal error: Unknown board type" << boardType;
@@ -876,7 +878,7 @@ void LinkManager::_addSerialAutoConnectLink()
     // Check for RTK GPS connection gone
     if (!_autoConnectRTKPort.isEmpty() && !currentPorts.contains(_autoConnectRTKPort)) {
         qCDebug(LinkManagerLog) << "RTK GPS disconnected" << _autoConnectRTKPort;
-        _toolbox->gpsManager()->disconnectGPS();
+        GPSManager::instance()->gpsRtk()->disconnectGPS();
         _autoConnectRTKPort.clear();
     }
 }
@@ -900,7 +902,7 @@ bool LinkManager::_allowAutoConnectToBoard(QGCSerialPortInfo::BoardType_t boardT
         }
         break;
     case QGCSerialPortInfo::BoardTypeRTKGPS:
-        if (_autoConnectSettings->autoConnectRTKGPS()->rawValue().toBool() && !_toolbox->gpsManager()->connected()) {
+        if (_autoConnectSettings->autoConnectRTKGPS()->rawValue().toBool() && !GPSManager::instance()->gpsRtk()->connected()) {
             return true;
         }
         break;

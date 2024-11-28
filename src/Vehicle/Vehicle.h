@@ -51,17 +51,15 @@ class Autotune;
 class ComponentInformationManager;
 class EventHandler;
 class FirmwarePlugin;
-class FirmwarePluginManager;
 class FTPManager;
 class GeoFenceManager;
 class ImageProtocolManager;
 class StatusTextHandler;
 class InitialConnectStateMachine;
 class Joystick;
-class JoystickManager;
 class LinkInterface;
 class LinkManager;
-class MAVLinkProtocol;
+class MAVLinkLogManager;
 class MissionManager;
 class ParameterManager;
 class QGCCameraManager;
@@ -82,10 +80,6 @@ class GimbalController;
 #ifdef QGC_UTM_ADAPTER
 class UTMSPVehicle;
 #endif
-#ifndef OPAQUE_PTR_VEHICLE
-    #define OPAQUE_PTR_VEHICLE
-    Q_DECLARE_OPAQUE_POINTER(Actuators*)
-#endif
 
 namespace events {
 namespace parser {
@@ -105,6 +99,7 @@ class Vehicle : public VehicleFactGroup
     Q_MOC_INCLUDE("Autotune.h")
     Q_MOC_INCLUDE("RemoteIDManager.h")
     Q_MOC_INCLUDE("QGCCameraManager.h")
+    Q_MOC_INCLUDE("Actuators/Actuators.h")
 
     friend class InitialConnectStateMachine;
     friend class VehicleLinkManager;
@@ -120,8 +115,6 @@ public:
             int                     defaultComponentId,
             MAV_AUTOPILOT           firmwareType,
             MAV_TYPE                vehicleType,
-            FirmwarePluginManager*  firmwarePluginManager,
-            JoystickManager*        joystickManager,
             QObject*                parent = nullptr);
 
     // Pass these into the offline constructor to create an offline vehicle which tracks the offline vehicle settings
@@ -131,7 +124,6 @@ public:
     // The following is used to create a disconnected Vehicle for use while offline editing.
     Vehicle(MAV_AUTOPILOT           firmwareType,
             MAV_TYPE                vehicleType,
-            FirmwarePluginManager*  firmwarePluginManager,
             QObject*                parent = nullptr);
 
     ~Vehicle();
@@ -1000,7 +992,6 @@ private:
     FirmwarePlugin*     _firmwarePlugin = nullptr;
     QObject*            _firmwarePluginInstanceData = nullptr;
     AutoPilotPlugin*    _autopilotPlugin = nullptr;
-    MAVLinkProtocol*    _mavlink = nullptr;
     bool                _soloFirmware = false;
     QGCToolbox*         _toolbox = nullptr;
     SettingsManager*    _settingsManager = nullptr;
@@ -1062,8 +1053,6 @@ private:
 
     LinkManager*                    _linkManager                    = nullptr;
     ParameterManager*               _parameterManager               = nullptr;
-    FirmwarePluginManager*          _firmwarePluginManager          = nullptr;
-    JoystickManager*                _joystickManager                = nullptr;
     ComponentInformationManager*    _componentInformationManager    = nullptr;
     VehicleObjectAvoidance*         _objectAvoidance                = nullptr;
     Autotune*                       _autotune                       = nullptr;
@@ -1312,7 +1301,7 @@ private:
     uint16_t _lastSetMsgIntervalMsgId = 0;
 
 /*===========================================================================*/
-/*                         STATUS TEXT HANDLER                               */
+/*                         Status Text Handler                               */
 /*===========================================================================*/
 private:
     Q_PROPERTY(bool    messageTypeNone    READ messageTypeNone    NOTIFY messageTypeChanged)
@@ -1376,7 +1365,24 @@ private:
     void _createImageProtocolManager();
 
     ImageProtocolManager *_imageProtocolManager = nullptr;
-};
 /*---------------------------------------------------------------------------*/
+/*===========================================================================*/
+/*                         MAVLink Log Manager                               */
+/*===========================================================================*/
+private:
+    Q_PROPERTY(MAVLinkLogManager *mavlinkLogManager READ mavlinkLogManager NOTIFY mavlinkLogManagerChanged)
 
+public:
+    MAVLinkLogManager *mavlinkLogManager() const;
+
+signals:
+    void mavlinkLogManagerChanged();
+
+private:
+    void _createMAVLinkLogManager();
+
+    MAVLinkLogManager *_mavlinkLogManager = nullptr;
+
+/*---------------------------------------------------------------------------*/
+};
 Q_DECLARE_METATYPE(Vehicle::MavCmdResultFailureCode_t)
